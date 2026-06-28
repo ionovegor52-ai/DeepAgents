@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeepSeek · 智能体工作室</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #f7f9fc; --surface: #ffffff; --border: #e2e8f0;
+      --text: #0b1a33; --text-secondary: #4a5a72;
+      --primary: #1a5cff; --primary-hover: #0d47cc;
+      --primary-light: #e6edfe; --code-bg: #f1f4f9;
+      --shadow: 0 4px 16px rgba(0,20,60,0.06);
+      --radius: 12px; --transition: 0.25s ease;
+      --blur-bg: rgba(0,0,0,0.5); --sidebar-width: 300px;
+    }
+    body.dark {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --text: #f0f6fc; --text-secondary: #8b949e;
+      --primary: #3b82f6; --primary-hover: #5690f0;
+      --primary-light: #1c2a3f; --code-bg: #1c2128;
+      --shadow: 0 4px 16px rgba(0,0,0,0.5);
+      --blur-bg: rgba(0,0,0,0.7);
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      transition: background var(--transition), color var(--transition);
+      min-height: 100vh; display: flex;
+    }
+    .sidebar {
+      position: fixed; top: 0; left: -320px;
+      width: var(--sidebar-width); height: 100%;
+      background: var(--surface); border-right: 1px solid var(--border);
+      padding: 20px 16px; overflow-y: auto;
+      transition: left 0.3s ease; z-index: 2000;
+      box-shadow: 2px 0 20px rgba(0,0,0,0.08);
+    }
+    .sidebar.open { left: 0; }
+    .sidebar-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 20px; padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-header h3 { font-size: 16px; font-weight: 600; }
+    .sidebar-close {
+      background: none; border: none; font-size: 24px;
+      cursor: pointer; color: var(--text-secondary);
+    }
+    .chat-list {
+      list-style: none; display: flex; flex-direction: column;
+    }
+    .chat-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 12px; border-radius: 8px; cursor: pointer;
+      transition: background var(--transition); margin-bottom: 4px;
+      position: relative; flex-wrap: wrap;
+    }
+    .chat-item:hover { background: var(--primary-light); }
+    .chat-item.active {
+      background: var(--primary-light); border-left: 3px solid var(--primary);
+    }
+    .chat-item .chat-info { flex: 1; min-width: 0; margin-right: 8px; }
+    .chat-item .chat-name {
+      font-size: 14px; font-weight: 500;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .chat-item .chat-agent-label {
+      font-size: 11px; color: var(--text-secondary); opacity: 0.7;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .chat-item .chat-actions { position: relative; flex-shrink: 0; }
+    .chat-item .dot-menu {
+      background: none; border: none; font-size: 18px;
+      cursor: pointer; color: var(--text-secondary); padding: 0 4px;
+    }
+    .chat-item .dot-menu:hover { color: var(--text); }
+    .delete-popup {
+      display: none; position: absolute; right: 0; top: 28px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 6px 14px; box-shadow: var(--shadow);
+      z-index: 10; font-size: 13px; color: #e74c3c; cursor: pointer;
+    }
+    .delete-popup:hover { background: #fee; }
+    .delete-popup.open { display: block; }
+    .main-content {
+      flex: 1; padding: 20px 24px; max-width: 1100px;
+      margin: 0 auto; width: 100%;
+    }
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 0 24px; border-bottom: 1px solid var(--border);
+      flex-wrap: wrap; gap: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .menu-btn {
+      background: none; border: none; font-size: 26px;
+      cursor: pointer; color: var(--text); padding: 0 4px;
+    }
+    .logo { font-size: 22px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .logo span { color: var(--primary); }
+    .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); padding: 8px 18px; border-radius: 30px;
+      font-size: 14px; font-weight: 450; cursor: pointer;
+      transition: all var(--transition); display: inline-flex;
+      align-items: center; gap: 6px;
+    }
+    .btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+    .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); color: #fff; }
+    .agent-bar {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin: 20px 0 24px; align-items: center;
+    }
+    .agent-pill {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 40px; padding: 8px 20px; font-size: 14px;
+      cursor: pointer; transition: all var(--transition);
+      color: var(--text-secondary); display: inline-flex;
+      align-items: center; gap: 6px;
+    }
+    .agent-pill.active {
+      border-color: var(--primary); background: var(--primary-light);
+      color: var(--primary); font-weight: 500;
+    }
+    .agent-pill:hover { border-color: var(--primary); }
+    .agent-pill .agent-delete-btn {
+      background: none; border: none; color: var(--text-secondary);
+      cursor: pointer; font-size: 16px; padding: 0 2px;
+      opacity: 0.4; transition: opacity 0.2s;
+    }
+    .agent-pill .agent-delete-btn:hover { opacity: 1; color: #e74c3c; }
+    .chat-window {
+      background: var(--surface); border-radius: var(--radius);
+      border: 1px solid var(--border); box-shadow: var(--shadow);
+      padding: 20px 20px 12px; margin-bottom: 16px;
+      min-height: 380px; max-height: 520px; overflow-y: auto;
+      will-change: transform;
+    }
+    .message {
+      margin-bottom: 18px;
+      animation: fadeIn 0.15s ease;
+      opacity: 1;
+      transition: opacity 0.1s;
+    }
+    .message .role {
+      font-size: 13px; font-weight: 500; color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    .message .content {
+      font-size: 15px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+    }
+    .message .content code {
+      display: block; background: var(--code-bg); padding: 14px 16px;
+      border-radius: 8px; font-size: 14px; overflow-x: auto;
+      margin: 10px 0 6px; border-left: 3px solid var(--primary);
+      font-family: "JetBrains Mono", monospace;
+    }
+    .copy-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 14px; font-size: 12px;
+      color: var(--text-secondary); cursor: pointer;
+      transition: all var(--transition); margin-top: 4px;
+    }
+    .copy-btn:hover { border-color: var(--primary); color: var(--primary); }
+    @keyframes fadeIn {
+      from { opacity: 0.4; transform: translateY(2px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .input-area {
+      display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;
+    }
+    .input-area textarea {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 16px; font-size: 15px;
+      font-family: inherit; color: var(--text); resize: vertical;
+      min-height: 48px; transition: border var(--transition);
+    }
+    .input-area textarea:focus { outline: none; border-color: var(--primary); }
+    .input-area .btn {
+      padding: 10px 28px; background: var(--primary);
+      border-color: var(--primary); color: #fff; font-weight: 500; height: 48px;
+    }
+    .input-area .btn:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%; background: var(--blur-bg);
+      backdrop-filter: blur(8px); z-index: 3000;
+      justify-content: center; align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--surface); border-radius: var(--radius);
+      padding: 32px 36px; max-width: 520px; width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      border: 1px solid var(--border); animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal-box h2 { font-size: 20px; font-weight: 600; margin-bottom: 20px; color: var(--text); }
+    .modal-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+    .modal-row label { font-size: 14px; font-weight: 450; color: var(--text-secondary); }
+    .modal-row select, .modal-row input, .modal-row textarea {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 14px; font-size: 14px;
+      color: var(--text); font-family: inherit;
+    }
+    .modal-row select:focus, .modal-row input:focus, .modal-row textarea:focus {
+      outline: none; border-color: var(--primary);
+    }
+    .modal-row textarea { min-height: 70px; resize: vertical; }
+    .modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px; }
+    .modal-actions .btn { padding: 8px 28px; }
+    .footer {
+      margin-top: 24px; font-size: 13px; color: var(--text-secondary);
+      text-align: center; border-top: 1px solid var(--border); padding-top: 18px;
+    }
+    @media (max-width: 640px) {
+      .header { flex-direction: row; flex-wrap: wrap; }
+      .sidebar { width: 260px; left: -280px; }
+      .agent-bar { gap: 6px; }
+      .agent-pill { font-size: 13px; padding: 6px 14px; }
+      .input-area { flex-direction: column; }
+      .input-area .btn { width: 100%; justify-content: center; }
+      .modal-box { padding: 24px 20px; }
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <h3 id="sidebarTitle">≡ 聊天记录</h3>
+    <button class="sidebar-close" id="sidebarClose">✕</button>
+  </div>
+  <ul class="chat-list" id="chatList"></ul>
+</div>
+
+<div class="main-content">
+  <div class="header">
+    <div class="header-left">
+      <button class="menu-btn" id="menuBtn">≡</button>
+      <div class="logo" id="logo">◈ <span>Deep</span>Seek · 智能体</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn" id="newChatBtn">＋ 新聊天</button>
+      <button class="btn" id="toggleSettingsBtn">⚙ 设置</button>
+      <button class="btn" id="toggleCreateBtn">＋ 创建智能体</button>
+    </div>
+  </div>
+
+  <div class="agent-bar" id="agentBar"></div>
+  <div class="chat-window" id="chatWindow"></div>
+
+  <div class="input-area">
+    <textarea id="userInput" rows="1" placeholder=""></textarea>
+    <button class="btn" id="sendBtn">发送</button>
+  </div>
+
+  <div class="footer" id="footerText">DeepSeek · 开放智能体 · 本地存储</div>
+</div>
+
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-box">
+    <h2 id="settingsTitle">⚙ 设置</h2>
+    <div class="modal-row"><label id="langLabel">界面语言</label><select id="langSelect"><option value="zh">中文</option><option value="ru">Русский</option><option value="en">English</option></select></div>
+    <div class="modal-row"><label id="themeLabel">主题</label><select id="themeSelect"><option value="light">浅色</option><option value="dark">深色</option></select></div>
+    <div class="modal-row"><label id="speedLabel">生成速度</label><select id="speedSelect"><option value="10">快速</option><option value="30">标准</option><option value="60">慢速</option></select></div>
+    <div class="modal-actions">
+      <button class="btn" id="closeSettingsBtn" style="background:var(--bg);">关闭</button>
+      <button class="btn btn-primary" id="saveSettingsBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="createModal">
+  <div class="modal-box">
+    <h2 id="createTitle">＋ 创建智能体</h2>
+    <div class="modal-row"><label id="nameLabel">名称</label><input type="text" id="newAgentName" placeholder="例如: 诗人" /></div>
+    <div class="modal-row"><label id="promptLabel">系统提示词</label><textarea id="newAgentPrompt" placeholder="你是一位诗人，用中文写诗…"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn" id="closeCreateBtn" style="background:var(--bg);">取消</button>
+      <button class="btn btn-primary" id="createAgentBtn">创建</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ================================================================
+  //  КОНФИГУРАЦИЯ
+  // ================================================================
+
+  const CONFIG = {
+    OPENROUTER_KEY: '',
+    MODEL: 'deepseek/deepseek-chat',
+    SITE: 'https://deepseek-agent.studio',
+  };
+
+  // ================================================================
+  //  ВСТРОЕННЫЕ АГЕНТЫ
+  // ================================================================
+
+  const BUILTIN_AGENTS = {
+    assistant: {
+      id: 'assistant',
+      name: { zh: '助理', ru: 'Ассистент', en: 'Assistant' },
+      prompt: {
+        zh: 'Ты — Ассистент. Ты помогаешь пользователю разбираться в этом сайте. Объясняй, как работают чаты, агенты, настройки, создание агентов, переключение языка и темы. Отвечай дружелюбно и понятно.',
+        ru: 'Ты — Ассистент. Ты помогаешь пользователю разбираться в этом сайте. Объясняй, как работают чаты, агенты, настройки, создание агентов, переключение языка и темы. Отвечай дружелюбно и понятно.',
+        en: 'You are an Assistant. You help the user understand this site. Explain how chats, agents, settings, agent creation, language and theme switching work. Answer in a friendly and clear way.'
+      },
+      welcome: { zh: '你好，我是 DeepSeek 智能体。选择角色开始对话。', ru: 'Здравствуйте! Я Ассистент. Помогу разобраться с функциями этого сайта. Задавайте вопросы!', en: 'Hello! I am the Assistant. I\'ll help you understand this site\'s features. Ask me anything!' }
+    },
+    programmer: {
+      id: 'programmer',
+      name: { zh: '程序员', ru: 'Программист', en: 'Programmer' },
+      prompt: { zh: '你是资深程序员。提供代码示例，用代码块标注。解释逻辑。回答严谨。', ru: 'Ты опытный программист. Приводи примеры кода в блоках. Объясняй логику. Отвечай строго.', en: 'You are a senior programmer. Provide code examples in blocks. Explain logic. Answer rigorously.' },
+      welcome: { zh: '你好，我是程序员智能体。随时为你解答编程问题。', ru: 'Здравствуйте! Я агент-программист. Готов помочь с кодом.', en: 'Hello! I am a programmer agent. Ready to help with coding.' }
+    },
+    scientist: {
+      id: 'scientist',
+      name: { zh: '科学家', ru: 'Учёный', en: 'Scientist' },
+      prompt: { zh: '你是物理学博士。用清晰的语言解释复杂概念，引用科学方法。', ru: 'Ты доктор физических наук. Объясняй сложные концепции ясным языком, ссылайся на научный метод.', en: 'You are a PhD in physics. Explain complex concepts in clear language, refer to the scientific method.' },
+      welcome: { zh: '你好，我是科学家智能体。一起探索科学的奥秘吧。', ru: 'Здравствуйте! Я агент-учёный. Давайте исследовать науку.', en: 'Hello! I am a scientist agent. Let\'s explore science together.' }
+    },
+    psychologist: {
+      id: 'psychologist',
+      name: { zh: '心理学家', ru: 'Психолог', en: 'Psychologist' },
+      prompt: { zh: '你是心理咨询师。倾听、共情、提出反思性问题。不支持诊断。', ru: 'Ты психолог-консультант. Слушай, проявляй эмпатию, задавай рефлексивные вопросы. Не давай диагнозов.', en: 'You are a counseling psychologist. Listen, empathize, ask reflective questions. Do not diagnose.' },
+      welcome: { zh: '你好，我是心理学家智能体。愿意倾听你的心声。', ru: 'Здравствуйте! Я агент-психолог. Готов выслушать вас.', en: 'Hello! I am a psychologist agent. I\'m here to listen.' }
+    },
+    teacher: {
+      id: 'teacher',
+      name: { zh: '教师', ru: 'Учитель', en: 'Teacher' },
+      prompt: { zh: '你是耐心的教师。解释概念，举例，鼓励学生提问。', ru: 'Ты терпеливый учитель. Объясняй концепции, приводи примеры, поощряй вопросы.', en: 'You are a patient teacher. Explain concepts, give examples, encourage questions.' },
+      welcome: { zh: '你好，我是教师智能体。让我们开始学习吧！', ru: 'Здравствуйте! Я агент-учитель. Давайте учиться!', en: 'Hello! I am a teacher agent. Let\'s start learning!' }
+    }
+  };
+
+  let state = {
+    lang: 'zh',
+    theme: 'light',
+    speed: 30,
+    isGenerating: false,
+    currentChatId: null,
+    chats: {},
+    customAgents: [],
+    nextChatId: 1,
+    sidebarOpen: false,
+    deletePopupOpen: null,
+  };
+
+  // ================================================================
+  //  МНОГОЯЗЫЧИЕ
+  // ================================================================
+
+  const I18N = {
+    zh: {
+      logo: '◈ DeepSeek · 智能体',
+      placeholder: '输入消息 …',
+      send: '发送',
+      newChat: '新聊天',
+      settings: '设置',
+      create: '创建智能体',
+      agentCreated: '智能体已创建',
+      agentDeleted: '智能体已删除',
+      settingsTitle: '⚙ 设置',
+      langLabel: '界面语言',
+      themeLabel: '主题',
+      speedLabel: '生成速度',
+      nameLabel: '名称',
+      promptLabel: '系统提示词',
+      save: '保存',
+      close: '关闭',
+      cancel: '取消',
+      createBtn: '创建',
+      light: '浅色',
+      dark: '深色',
+      fast: '快速',
+      standard: '标准',
+      slow: '慢速',
+      footer: 'DeepSeek · 开放智能体 · 本地存储',
+      sidebarTitle: '≡ 聊天记录',
+      delete: '删除',
+      deleteAgentConfirm: '确认删除智能体 "{name}"？所有相关聊天将被删除。',
+      newChatDefault: '新对话',
+      generatingName: '生成名称中…',
+      withAgent: '与 {agent}',
+      copy: '复制',
+      copied: '已复制',
+      userRole: '用户',
+      noChats: '暂无聊天记录，开始对话吧！',
+    },
+    ru: {
+      logo: '◈ DeepSeek · Агенты',
+      placeholder: 'Введите сообщение …',
+      send: 'Отправить',
+      newChat: 'Новый чат',
+      settings: 'Настройки',
+      create: 'Создать агента',
+      agentCreated: 'Агент создан',
+      agentDeleted: 'Агент удалён',
+      settingsTitle: '⚙ Настройки',
+      langLabel: 'Язык интерфейса',
+      themeLabel: 'Тема',
+      speedLabel: 'Скорость генерации',
+      nameLabel: 'Название',
+      promptLabel: 'Системный промпт',
+      save: 'Сохранить',
+      close: 'Закрыть',
+      cancel: 'Отмена',
+      createBtn: 'Создать',
+      light: 'Светлая',
+      dark: 'Тёмная',
+      fast: 'Быстрая',
+      standard: 'Стандартная',
+      slow: 'Медленная',
+      footer: 'DeepSeek · Открытые агенты · Локальные данные',
+      sidebarTitle: '≡ История чатов',
+      delete: 'Удалить',
+      deleteAgentConfirm: 'Удалить агента "{name}"? Все связанные чаты будут удалены.',
+      newChatDefault: 'Новый диалог',
+      generatingName: 'Генерация названия…',
+      withAgent: 'с {agent}',
+      copy: 'Копировать',
+      copied: 'Скопировано',
+      userRole: 'Пользователь',
+      noChats: 'Нет чатов. Начните диалог!',
+    },
+    en: {
+      logo: '◈ DeepSeek · Agents',
+      placeholder: 'Type a message …',
+      send: 'Send',
+      newChat: 'New chat',
+      settings: 'Settings',
+      create: 'Create agent',
+      agentCreated: 'Agent created',
+      agentDeleted: 'Agent deleted',
+      settingsTitle: '⚙ Settings',
+      langLabel: 'Language',
+      themeLabel: 'Theme',
+      speedLabel: 'Generation speed',
+      nameLabel: 'Name',
+      promptLabel: 'System prompt',
+      save: 'Save',
+      close: 'Close',
+      cancel: 'Cancel',
+      createBtn: 'Create',
+      light: 'Light',
+      dark: 'Dark',
+      fast: 'Fast',
+      standard: 'Standard',
+      slow: 'Slow',
+      footer: 'DeepSeek · Open Agents · Local Storage',
+      sidebarTitle: '≡ Chat history',
+      delete: 'Delete',
+      deleteAgentConfirm: 'Delete agent "{name}"? All related chats will be deleted.',
+      newChatDefault: 'New conversation',
+      generatingName: 'Generating name…',
+      withAgent: 'with {agent}',
+      copy: 'Copy',
+      copied: 'Copied',
+      userRole: 'User',
+      noChats: 'No chats. Start a conversation!',
+    }
+  };
+
+  function t(key) { return I18N[state.lang]?.[key] || I18N.zh[key] || key; }
+
+  // ================================================================
+  //  DOM
+  // ================================================================
+
+  const sidebar = document.getElementById('sidebar');
+  const sidebarTitle = document.getElementById('sidebarTitle');
+  const chatList = document.getElementById('chatList');
+  const menuBtn = document.getElementById('menuBtn');
+  const sidebarClose = document.getElementById('sidebarClose');
+  const logo = document.getElementById('logo');
+  const chatWindow = document.getElementById('chatWindow');
+  const userInput = document.getElementById('userInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const agentBar = document.getElementById('agentBar');
+  const footerText = document.getElementById('footerText');
+  const newChatBtn = document.getElementById('newChatBtn');
+  const toggleSettingsBtn = document.getElementById('toggleSettingsBtn');
+  const toggleCreateBtn = document.getElementById('toggleCreateBtn');
+  const settingsModal = document.getElementById('settingsModal');
+  const createModal = document.getElementById('createModal');
+  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+  const closeCreateBtn = document.getElementById('closeCreateBtn');
+  const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+  const langSelect = document.getElementById('langSelect');
+  const themeSelect = document.getElementById('themeSelect');
+  const speedSelect = document.getElementById('speedSelect');
+  const newAgentName = document.getElementById('newAgentName');
+  const newAgentPrompt = document.getElementById('newAgentPrompt');
+  const createAgentBtn = document.getElementById('createAgentBtn');
+  const settingsTitle = document.getElementById('settingsTitle');
+  const createTitle = document.getElementById('createTitle');
+  const langLabel = document.getElementById('langLabel');
+  const themeLabel = document.getElementById('themeLabel');
+  const speedLabel = document.getElementById('speedLabel');
+  const nameLabel = document.getElementById('nameLabel');
+  const promptLabel = document.getElementById('promptLabel');
+
+  // ================================================================
+  //  ЯДРО
+  // ================================================================
+
+  function getAgentName(agentId) {
+    if (BUILTIN_AGENTS[agentId]) {
+      return BUILTIN_AGENTS[agentId].name[state.lang] || BUILTIN_AGENTS[agentId].name.zh;
+    }
+    const custom = state.customAgents.find(a => a.id === agentId);
+    return custom ? custom.name : 'AI';
+  }
+
+  function getAgentWelcome(agentId) {
+    if (BUILTIN_AGENTS[agentId]) {
+      return BUILTIN_AGENTS[agentId].welcome[state.lang] || BUILTIN_AGENTS[agentId].welcome.zh;
+    }
+    const custom = state.customAgents.find(a => a.id === agentId);
+    return custom ? `Здравствуйте! Я ${custom.name}.` : 'Здравствуйте! Я AI.';
+  }
+
+  function getSystemPrompt(agentId, lastMessages = []) {
+    let prompt = '';
+    const agentName = getAgentName(agentId);
+    
+    if (BUILTIN_AGENTS[agentId]) {
+      prompt = BUILTIN_AGENTS[agentId].prompt[state.lang] || BUILTIN_AGENTS[agentId].prompt.zh;
+    } else {
+      const custom = state.customAgents.find(a => a.id === agentId);
+      prompt = custom ? custom.prompt : 'You are a helpful assistant.';
+    }
+
+    let fullPrompt = `Ты — "${agentName}". Ты ОБЯЗАН следовать этому промпту: ${prompt}. Ты НЕ должен говорить, что ты ChatGPT, OpenAI, или любая другая модель. Ты — ${agentName}. Отвечай на языке пользователя.`;
+
+    if (lastMessages.length > 0) {
+      const history = lastMessages.slice(-10).map(msg => {
+        const role = msg.role === 'user' ? t('userRole') : agentName;
+        return `${role}: ${msg.content}`;
+      }).join('\n');
+      fullPrompt += `\n\nВот история последнего диалога (используй её для контекста):\n${history}`;
+    }
+
+    return fullPrompt;
+  }
+
+  function getCurrentChat() {
+    if (!state.currentChatId || !state.chats[state.currentChatId]) {
+      const id = String(state.nextChatId++);
+      const agentId = 'assistant';
+      state.chats[id] = {
+        agentId: agentId,
+        messages: [{ role: 'assistant', content: getAgentWelcome(agentId) }],
+        name: t('newChatDefault'),
+        hasUserMessage: false,
+      };
+      state.currentChatId = id;
+    }
+    return state.chats[state.currentChatId];
+  }
+
+  function getCurrentAgentId() {
+    const chat = getCurrentChat();
+    return chat.agentId;
+  }
+
+  function saveToStorage() {
+    const data = {
+      chats: state.chats,
+      customAgents: state.customAgents,
+      nextChatId: state.nextChatId,
+      currentChatId: state.currentChatId,
+      lang: state.lang,
+      theme: state.theme,
+      speed: state.speed,
+    };
+    try {
+      localStorage.setItem('deepseek_agent_data', JSON.stringify(data));
+    } catch (_) {}
+  }
+
+  function loadFromStorage() {
+    try {
+      const raw = localStorage.getItem('deepseek_agent_data');
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      state.chats = data.chats || {};
+      state.customAgents = data.customAgents || [];
+      state.nextChatId = data.nextChatId || 1;
+      state.currentChatId = data.currentChatId || null;
+      state.lang = data.lang || 'zh';
+      state.theme = data.theme || 'light';
+      state.speed = data.speed || 30;
+      if (state.currentChatId && !state.chats[state.currentChatId]) {
+        state.currentChatId = null;
+      }
+      return true;
+    } catch (_) { return false; }
+  }
+
+  // ================================================================
+  //  ОТРИСОВКА
+  // ================================================================
+
+  function renderMessages() {
+    const chat = getCurrentChat();
+    const scrollPos = chatWindow.scrollTop;
+    const isNearBottom = chatWindow.scrollHeight - chatWindow.clientHeight - scrollPos < 50;
+
+    chatWindow.innerHTML = '';
+    chat.messages.forEach(msg => {
+      const div = document.createElement('div');
+      div.className = 'message';
+      let roleLabel;
+      if (msg.role === 'user') {
+        roleLabel = t('userRole');
+      } else {
+        roleLabel = getAgentName(chat.agentId);
+      }
+      div.innerHTML = `<div class="role">${roleLabel}</div><div class="content">${formatContent(msg.content)}</div>`;
+      chatWindow.appendChild(div);
+    });
+
+    if (isNearBottom || chat.messages.length > 0) {
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    } else {
+      chatWindow.scrollTop = scrollPos;
+    }
+  }
+
+  function formatContent(text) {
+    let html = text;
+    const codeRegex = /```(\w*)\n([\s\S]*?)```/g;
+    let match;
+    const parts = [];
+    let lastIdx = 0;
+    while ((match = codeRegex.exec(html)) !== null) {
+      const code = match[2];
+      parts.push(html.slice(lastIdx, match.index));
+      const copyText = t('copy');
+      parts.push(`<code>${escapeHtml(code)}</code><button class="copy-btn" onclick="copyCode(this)">${copyText}</button>`);
+      lastIdx = match.index + match[0].length;
+    }
+    parts.push(html.slice(lastIdx));
+    return parts.join('');
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  window.copyCode = function(btn) {
+    const code = btn.previousElementSibling.textContent;
+    navigator.clipboard?.writeText(code).then(() => {
+      btn.textContent = t('copied');
+      setTimeout(() => btn.textContent = t('copy'), 1500);
+    });
+  };
+
+  function renderAgentPills() {
+    agentBar.innerHTML = '';
+    const currentAgentId = getCurrentAgentId();
+
+    Object.entries(BUILTIN_AGENTS).forEach(([id, ag]) => {
+      const btn = document.createElement('button');
+      btn.className = `agent-pill ${currentAgentId === id ? 'active' : ''}`;
+      btn.dataset.agent = id;
+      btn.textContent = ag.name[state.lang] || ag.name.zh;
+      btn.addEventListener('click', () => switchAgent(id));
+      agentBar.appendChild(btn);
+    });
+
+    state.customAgents.forEach(ag => {
+      const btn = document.createElement('button');
+      btn.className = `agent-pill custom-agent ${currentAgentId === ag.id ? 'active' : ''}`;
+      btn.dataset.agent = ag.id;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = ag.name;
+      nameSpan.addEventListener('click', (e) => {
+        e.stopPropagation();
+        switchAgent(ag.id);
+      });
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'agent-delete-btn';
+      deleteBtn.textContent = '×';
+      deleteBtn.title = t('delete');
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm(t('deleteAgentConfirm').replace('{name}', ag.name))) {
+          deleteCustomAgent(ag.id);
+        }
+      });
+
+      btn.appendChild(nameSpan);
+      btn.appendChild(deleteBtn);
+      btn.addEventListener('click', (e) => {
+        if (e.target === btn) {
+          switchAgent(ag.id);
+        }
+      });
+      agentBar.appendChild(btn);
+    });
+  }
+
+  function deleteCustomAgent(agentId) {
+    const agent = state.customAgents.find(a => a.id === agentId);
+    if (!agent) return;
+
+    state.customAgents = state.customAgents.filter(a => a.id !== agentId);
+
+    const chatIdsToDelete = [];
+    for (const [id, chat] of Object.entries(state.chats)) {
+      if (chat.agentId === agentId) {
+        chatIdsToDelete.push(id);
+      }
+    }
+    chatIdsToDelete.forEach(id => delete state.chats[id]);
+
+    if (!state.chats[state.currentChatId]) {
+      const ids = Object.keys(state.chats);
+      if (ids.length > 0) {
+        state.currentChatId = ids[0];
+      } else {
+        const id = String(state.nextChatId++);
+        state.chats[id] = {
+          agentId: 'assistant',
+          messages: [{ role: 'assistant', content: getAgentWelcome('assistant') }],
+          name: t('newChatDefault'),
+          hasUserMessage: false,
+        };
+        state.currentChatId = id;
+      }
+    }
+
+    saveToStorage();
+    renderAll();
+    alert(t('agentDeleted'));
+  }
+
+  function switchAgent(agentId) {
+    if (state.isGenerating) return;
+
+    let existingChatId = null;
+    for (const [id, chat] of Object.entries(state.chats)) {
+      if (chat.agentId === agentId) {
+        existingChatId = id;
+        break;
+      }
+    }
+
+    if (existingChatId) {
+      state.currentChatId = existingChatId;
+    } else {
+      const id = String(state.nextChatId++);
+      state.chats[id] = {
+        agentId: agentId,
+        messages: [{ role: 'assistant', content: getAgentWelcome(agentId) }],
+        name: t('newChatDefault'),
+        hasUserMessage: false,
+      };
+      state.currentChatId = id;
+    }
+
+    renderAll();
+    saveToStorage();
+  }
+
+  function updatePlaceholder() {
+    const chat = getCurrentChat();
+    const name = getAgentName(chat.agentId);
+    if (userInput.value === '') {
+      userInput.placeholder = `${t('placeholder')} (${name})`;
+    }
+  }
+
+  function renderChatList() {
+    chatList.innerHTML = '';
+    
+    const visibleChats = {};
+    for (const [id, chat] of Object.entries(state.chats)) {
+      if (chat.hasUserMessage) {
+        visibleChats[id] = chat;
+      }
+    }
+
+    const ids = Object.keys(visibleChats);
+    if (ids.length === 0) {
+      const li = document.createElement('li');
+      li.style.cssText = 'color: var(--text-secondary); font-size: 14px; padding: 12px; text-align: center; list-style: none;';
+      li.textContent = t('noChats');
+      chatList.appendChild(li);
+      return;
+    }
+
+    const sortedIds = ids.sort((a, b) => Number(b) - Number(a));
+
+    sortedIds.forEach(id => {
+      const chat = visibleChats[id];
+      const li = document.createElement('li');
+      li.className = `chat-item ${state.currentChatId === id ? 'active' : ''}`;
+
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'chat-info';
+
+      const nameSpan = document.createElement('div');
+      nameSpan.className = 'chat-name';
+      nameSpan.textContent = chat.name || t('newChatDefault');
+
+      const agentLabel = document.createElement('div');
+      agentLabel.className = 'chat-agent-label';
+      const agentDisplayName = getAgentName(chat.agentId);
+      agentLabel.textContent = t('withAgent').replace('{agent}', agentDisplayName);
+
+      infoDiv.appendChild(nameSpan);
+      infoDiv.appendChild(agentLabel);
+
+      infoDiv.addEventListener('click', () => {
+        state.currentChatId = id;
+        renderAll();
+        closeSidebar();
+      });
+
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'chat-actions';
+
+      const dotBtn = document.createElement('button');
+      dotBtn.className = 'dot-menu';
+      dotBtn.textContent = '⋮';
+      dotBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleDeletePopup(id);
+      });
+
+      const deletePopup = document.createElement('div');
+      deletePopup.className = `delete-popup ${state.deletePopupOpen === id ? 'open' : ''}`;
+      deletePopup.textContent = t('delete');
+      deletePopup.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteChat(id);
+      });
+
+      actionsDiv.appendChild(dotBtn);
+      actionsDiv.appendChild(deletePopup);
+      li.appendChild(infoDiv);
+      li.appendChild(actionsDiv);
+      chatList.appendChild(li);
+    });
+  }
+
+  function toggleDeletePopup(chatId) {
+    if (state.deletePopupOpen === chatId) {
+      state.deletePopupOpen = null;
+    } else {
+      state.deletePopupOpen = chatId;
+    }
+    renderChatList();
+  }
+
+  function deleteChat(chatId) {
+    if (state.chats[chatId]) {
+      delete state.chats[chatId];
+      state.deletePopupOpen = null;
+      if (state.currentChatId === chatId) {
+        const ids = Object.keys(state.chats);
+        if (ids.length > 0) {
+          state.currentChatId = ids[0];
+        } else {
+          state.currentChatId = null;
+          getCurrentChat();
+        }
+      }
+      saveToStorage();
+      renderAll();
+    }
+  }
+
+  function createNewChat() {
+    if (state.isGenerating) return;
+    const currentAgentId = getCurrentAgentId();
+    const id = String(state.nextChatId++);
+    state.chats[id] = {
+      agentId: currentAgentId,
+      messages: [{ role: 'assistant', content: getAgentWelcome(currentAgentId) }],
+      name: t('newChatDefault'),
+      hasUserMessage: false,
+    };
+    state.currentChatId = id;
+    state.deletePopupOpen = null;
+    renderAll();
+    saveToStorage();
+    userInput.value = '';
+    userInput.focus();
+  }
+
+  // ================================================================
+  //  ГЕНЕРАЦИЯ НАЗВАНИЯ
+  // ================================================================
+
+  async function generateChatName(chatId, firstUserMessage) {
+    if (!firstUserMessage || firstUserMessage.length < 2) return;
+    const chat = state.chats[chatId];
+    if (!chat) return;
+
+    try {
+      const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${CONFIG.OPENROUTER_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': CONFIG.SITE,
+        },
+        body: JSON.stringify({
+          model: CONFIG.MODEL,
+          messages: [
+            { role: 'system', content: '你是一个命名助手。根据用户的第一条消息，生成一个简短的聊天标题（2-4个词）。只输出标题，不要有其他内容。' },
+            { role: 'user', content: firstUserMessage }
+          ],
+          max_tokens: 20,
+          temperature: 0.7,
+        }),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const name = data.choices?.[0]?.message?.content?.trim();
+        if (name && name.length > 0 && name.length < 40) {
+          chat.name = name;
+          saveToStorage();
+          renderChatList();
+        }
+      }
+    } catch (_) {}
+  }
+
+  // ================================================================
+  //  ОТПРАВКА СООБЩЕНИЙ
+  // ================================================================
+
+  async function sendMessage() {
+    if (state.isGenerating) return;
+    const text = userInput.value.trim();
+    if (!text) return;
+
+    const chat = getCurrentChat();
+    const isFirstUserMessage = chat.messages.length === 1 && chat.messages[0].role === 'assistant';
+
+    chat.hasUserMessage = true;
+
+    chat.messages.push({ role: 'user', content: text });
+    userInput.value = '';
+    renderMessages();
+    saveToStorage();
+
+    state.isGenerating = true;
+    sendBtn.textContent = '…';
+
+    const agentId = chat.agentId;
+    const lastMessages = chat.messages.slice(-10);
+    const systemPrompt = getSystemPrompt(agentId, lastMessages);
+
+    try {
+      const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${CONFIG.OPENROUTER_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': CONFIG.SITE,
+        },
+        body: JSON.stringify({
+          model: CONFIG.MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...chat.messages.map(m => ({ role: m.role, content: m.content }))
+          ],
+          stream: true,
+          temperature: 0.7,
+          max_tokens: 2048,
+        }),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.text();
+        throw new Error(`API error: ${resp.status} ${err}`);
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let full = '';
+      let buffer = '';
+
+      chat.messages.push({ role: 'assistant', content: '' });
+      const lastIdx = chat.messages.length - 1;
+      
+      renderMessages();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') continue;
+            try {
+              const json = JSON.parse(data);
+              const delta = json.choices?.[0]?.delta?.content;
+              if (delta) {
+                full += delta;
+                chat.messages[lastIdx].content = full;
+                renderMessages();
+                await sleep(state.speed);
+              }
+            } catch (_) {}
+          }
+        }
+      }
+      renderMessages();
+      saveToStorage();
+
+      if (isFirstUserMessage) {
+        generateChatName(state.currentChatId, text);
+      }
+
+    } catch (e) {
+      chat.messages.push({ role: 'assistant', content: `Ошибка: ${e.message}` });
+      renderMessages();
+      saveToStorage();
+    }
+
+    state.isGenerating = false;
+    sendBtn.textContent = t('send');
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ================================================================
+  //  НАСТРОЙКИ
+  // ================================================================
+
+  function applyTheme(theme) {
+    document.body.classList.toggle('dark', theme === 'dark');
+    state.theme = theme;
+    themeSelect.value = theme;
+    saveToStorage();
+  }
+
+  function applyLang(lang) {
+    state.lang = lang;
+    langSelect.value = lang;
+    updateUIText();
+
+    for (const [id, chat] of Object.entries(state.chats)) {
+      if (chat.messages.length > 0 && chat.messages[0].role === 'assistant') {
+        const firstMsg = chat.messages[0].content;
+        const isWelcome = firstMsg.includes('你好') || firstMsg.includes('Здравствуйте') || firstMsg.includes('Hello');
+        if (isWelcome) {
+          chat.messages[0].content = getAgentWelcome(chat.agentId);
+        }
+      }
+      const defaultNames = ['Новый диалог', '新对话', 'New conversation', '新对话', 'New Chat'];
+      if (defaultNames.includes(chat.name)) {
+        chat.name = t('newChatDefault');
+      }
+    }
+
+    renderAll();
+    saveToStorage();
+  }
+
+  function updateUIText() {
+    logo.innerHTML = t('logo');
+    newChatBtn.textContent = `＋ ${t('newChat')}`;
+    toggleSettingsBtn.textContent = `⚙ ${t('settings')}`;
+    toggleCreateBtn.textContent = `＋ ${t('create')}`;
+    sendBtn.textContent = t('send');
+    footerText.textContent = t('footer');
+    sidebarTitle.textContent = t('sidebarTitle');
+
+    settingsTitle.textContent = t('settingsTitle');
+    createTitle.textContent = `＋ ${t('create')}`;
+    langLabel.textContent = t('langLabel');
+    themeLabel.textContent = t('themeLabel');
+    speedLabel.textContent = t('speedLabel');
+    nameLabel.textContent = t('nameLabel');
+    promptLabel.textContent = t('promptLabel');
+
+    saveSettingsBtn.textContent = t('save');
+    closeSettingsBtn.textContent = t('close');
+    closeCreateBtn.textContent = t('cancel');
+    createAgentBtn.textContent = t('createBtn');
+
+    const themeOpts = themeSelect.options;
+    themeOpts[0].text = t('light');
+    themeOpts[1].text = t('dark');
+
+    const speedOpts = speedSelect.options;
+    speedOpts[0].text = t('fast');
+    speedOpts[1].text = t('standard');
+    speedOpts[2].text = t('slow');
+
+    renderAgentPills();
+    updatePlaceholder();
+    renderChatList();
+    renderMessages();
+  }
+
+  // ================================================================
+  //  СОЗДАНИЕ АГЕНТА
+  // ================================================================
+
+  function createCustomAgent() {
+    const name = newAgentName.value.trim();
+    const prompt = newAgentPrompt.value.trim();
+    if (!name || !prompt) {
+      alert('请输入名称和提示词');
+      return;
+    }
+    const id = 'custom_' + Date.now();
+    state.customAgents.push({ id, name, prompt });
+
+    const chatId = String(state.nextChatId++);
+    state.chats[chatId] = {
+      agentId: id,
+      messages: [{ role: 'assistant', content: getAgentWelcome(id) }],
+      name: t('newChatDefault'),
+      hasUserMessage: false,
+    };
+    state.currentChatId = chatId;
+
+    newAgentName.value = '';
+    newAgentPrompt.value = '';
+    createModal.classList.remove('open');
+    renderAll();
+    saveToStorage();
+    alert(t('agentCreated'));
+  }
+
+  // ================================================================
+  //  САЙДБАР
+  // ================================================================
+
+  function openSidebar() {
+    sidebar.classList.add('open');
+    state.sidebarOpen = true;
+    renderChatList();
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    state.sidebarOpen = false;
+    state.deletePopupOpen = null;
+  }
+
+  function toggleSidebar() {
+    if (state.sidebarOpen) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
+  }
+
+  // ================================================================
+  //  МОДАЛКИ
+  // ================================================================
+
+  function openModal(modal) { modal.classList.add('open'); }
+  function closeModal(modal) { modal.classList.remove('open'); }
+
+  // ================================================================
+  //  РЕНДЕР ВСЕГО
+  // ================================================================
+
+  function renderAll() {
+    renderAgentPills();
+    renderMessages();
+    updatePlaceholder();
+    renderChatList();
+    updateUIText();
+  }
+
+  // ================================================================
+  //  СОБЫТИЯ
+  // ================================================================
+
+  menuBtn.addEventListener('click', toggleSidebar);
+  sidebarClose.addEventListener('click', closeSidebar);
+  document.addEventListener('click', (e) => {
+    if (state.sidebarOpen && !sidebar.contains(e.target) && e.target !== menuBtn) {
+      closeSidebar();
+    }
+  });
+
+  newChatBtn.addEventListener('click', createNewChat);
+
+  sendBtn.addEventListener('click', sendMessage);
+  userInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  toggleSettingsBtn.addEventListener('click', () => openModal(settingsModal));
+  closeSettingsBtn.addEventListener('click', () => closeModal(settingsModal));
+  saveSettingsBtn.addEventListener('click', () => {
+    applyLang(langSelect.value);
+    applyTheme(themeSelect.value);
+    state.speed = parseInt(speedSelect.value, 10) || 30;
+    closeModal(settingsModal);
+  });
+  settingsModal.addEventListener('click', (e) => {
+    if (e.target === settingsModal) closeModal(settingsModal);
+  });
+
+  toggleCreateBtn.addEventListener('click', () => openModal(createModal));
+  closeCreateBtn.addEventListener('click', () => closeModal(createModal));
+  createAgentBtn.addEventListener('click', createCustomAgent);
+  createModal.addEventListener('click', (e) => {
+    if (e.target === createModal) closeModal(createModal);
+  });
+
+  langSelect.addEventListener('change', (e) => applyLang(e.target.value));
+  themeSelect.addEventListener('change', (e) => applyTheme(e.target.value));
+  speedSelect.addEventListener('change', (e) => {
+    state.speed = parseInt(e.target.value, 10) || 30;
+    saveToStorage();
+  });
+
+  // ================================================================
+  //  ИНИЦИАЛИЗАЦИЯ
+  // ================================================================
+
+  function init() {
+    const hasStorage = loadFromStorage();
+
+    if (!hasStorage || Object.keys(state.chats).length === 0) {
+      const id = String(state.nextChatId++);
+      const agentId = 'assistant';
+      state.chats[id] = {
+        agentId: agentId,
+        messages: [{ role: 'assistant', content: getAgentWelcome(agentId) }],
+        name: t('newChatDefault'),
+        hasUserMessage: false,
+      };
+      state.currentChatId = id;
+    }
+
+    if (!state.currentChatId || !state.chats[state.currentChatId]) {
+      const ids = Object.keys(state.chats);
+      state.currentChatId = ids.length > 0 ? ids[0] : null;
+      if (!state.currentChatId) {
+        const id = String(state.nextChatId++);
+        const agentId = 'assistant';
+        state.chats[id] = {
+          agentId: agentId,
+          messages: [{ role: 'assistant', content: getAgentWelcome(agentId) }],
+          name: t('newChatDefault'),
+          hasUserMessage: false,
+        };
+        state.currentChatId = id;
+      }
+    }
+
+    applyTheme(state.theme);
+    applyLang(state.lang);
+    renderAll();
+    saveToStorage();
+
+    for (const [id, chat] of Object.entries(state.chats)) {
+      if (chat.messages.length > 0 && chat.messages[0].role === 'assistant') {
+        const firstMsg = chat.messages[0].content;
+        const isWelcome = firstMsg.includes('你好') || firstMsg.includes('Здравствуйте') || firstMsg.includes('Hello');
+        if (isWelcome) {
+          chat.messages[0].content = getAgentWelcome(chat.agentId);
+        }
+      }
+    }
+
+    userInput.value = '';
+    saveToStorage();
+    renderAll();
+  }
+
+  init();
+</script>
+</body>
+</html>
